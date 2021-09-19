@@ -1,4 +1,4 @@
-# docker-rust-templete
+# Machine-Learning-by-Rust
 
 コンテナ起動
 
