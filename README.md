@@ -4,6 +4,8 @@
 
 SmartCore
 
+polars
+
 cargo
 
 # コンテナ起動
