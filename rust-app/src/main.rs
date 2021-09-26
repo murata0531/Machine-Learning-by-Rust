@@ -36,7 +36,7 @@ fn read_csv_with_schema<P: AsRef<Path>>(path: P) -> PolarResult<DataFrame> {
         .finish()
 }
 
-/* 機能データフレームを smartcore で読める DenseMatrix に変換 */
+// 機能データフレームを smartcore で読める DenseMatrix に変換
 pub fn convert_features_to_matrix(df: &DataFrame) -> Result<DenseMatrix<f64>> {
     let nrows = df.height();
     let ncols = df.width();
@@ -60,4 +60,24 @@ pub fn convert_features_to_matrix(df: &DataFrame) -> Result<DenseMatrix<f64>> {
     }
 
     Ok(xmatrix)
+}
+
+//speciesのLabelエンコーディング用function
+fn str_to_num(str_val: &Series) -> Series {
+    str_val
+        .utf8()
+        .unwrap()
+        .into_iter()
+        .map(|opt_name: Option<&str>| {
+            opt_name.map(|name: &str| {
+                match name {
+                    "Adelie" => 1,
+                    "Chinstrap" => 2,
+                    "Gentoo" => 3,
+                    _ => panic!("Problem species str to num"),
+                }
+            })
+        })
+        .collect::<UInt32Chunked>()
+        .into_series()
 }
