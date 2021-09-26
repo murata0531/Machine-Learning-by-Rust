@@ -17,7 +17,7 @@ use polars::prelude::Result as PolarResult;
 use polars::prelude::SerReader;
 
 
-// CSVファイルを読み込んでDataFrameを返す
+//CSVファイルを読み込んでDataFrameを返す
 fn read_csv_with_schema<P: AsRef<Path>>(path: P) -> PolarResult<DataFrame> {
     let schema = Schema::new(vec![
         Field::new("species", DataType::Utf8),
@@ -36,7 +36,19 @@ fn read_csv_with_schema<P: AsRef<Path>>(path: P) -> PolarResult<DataFrame> {
         .finish()
 }
 
-// 機能データフレームを smartcore で読める DenseMatrix に変換
+//featureとtargetに分割
+fn get_feature_target(df: &DataFrame) -> (PolarResult<DataFrame>, PolarResult<DataFrame>) {
+    let features = df.select(vec![
+        "culmen_length_mm",
+        "culmen_depth_mm",
+        "flipper_length_mm",
+        "body_mass_g",
+    ]);
+    let target = df.select("species");
+    (features, target)
+}
+
+/* 機能データフレームを smartcore で読める DenseMatrix に変換 */
 pub fn convert_features_to_matrix(df: &DataFrame) -> Result<DenseMatrix<f64>> {
     let nrows = df.height();
     let ncols = df.width();
@@ -80,4 +92,46 @@ fn str_to_num(str_val: &Series) -> Series {
         })
         .collect::<UInt32Chunked>()
         .into_series()
+}
+
+fn main() {
+
+    //csv読み込み
+    let csv = "penguins_size.csv";
+    let df: DataFrame = read_csv_with_schema(&csv).unwrap();
+
+    //不正データdrop
+    let df2 = df.drop_nulls(None).unwrap();
+
+    //featrures/target分割
+    let (feature, target) = get_feature_target(&df2);
+
+    //features変換
+    let xmatrix = convert_features_to_matrix(&feature.unwrap());
+
+    //speciesのLabelエンコーディング
+    let target_array = target
+        .unwrap()
+        .apply("species", str_to_num)
+        .unwrap()
+        .to_ndarray::<Float64Type>()
+        .unwrap();
+
+    // create a vec type and populate with y values
+    let mut y: Vec<f64> = Vec::new();
+    for val in target_array.iter() {
+        y.push(*val);
+    }
+
+    //データ分割
+    let (x_train, x_test, y_train, y_test) = train_test_split(&xmatrix.unwrap(), &y, 0.3, true);
+
+    //学習
+    let reg = LogisticRegression::fit(&x_train, &y_train, Default::default()).unwrap();
+
+    //予測
+    let preds = reg.predict(&x_test).unwrap();
+    let mse = mean_squared_error(&y_test, &preds);
+    println!("MSE: {}", mse);
+    println!("accuracy : {}", accuracy(&y_test, &preds));
 }
