@@ -35,3 +35,29 @@ fn read_csv_with_schema<P: AsRef<Path>>(path: P) -> PolarResult<DataFrame> {
         .with_ignore_parser_errors(true) //エラーが出ても処理継続
         .finish()
 }
+
+/* 機能データフレームを smartcore で読める DenseMatrix に変換 */
+pub fn convert_features_to_matrix(df: &DataFrame) -> Result<DenseMatrix<f64>> {
+    let nrows = df.height();
+    let ncols = df.width();
+
+    let features_res = df.to_ndarray::<Float64Type>().unwrap();
+    let mut xmatrix: DenseMatrix<f64> = BaseMatrix::zeros(nrows, ncols);
+    let mut col: u32 = 0;
+    let mut row: u32 = 0;
+
+    for val in features_res.iter() {
+        let m_row = usize::try_from(row).unwrap();
+        let m_col = usize::try_from(col).unwrap();
+        xmatrix.set(m_row, m_col, *val);
+        // check what we have to update
+        if m_col == ncols - 1 {
+            row += 1;
+            col = 0;
+        } else {
+            col += 1;
+        }
+    }
+
+    Ok(xmatrix)
+}
